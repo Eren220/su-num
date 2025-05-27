@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+<title>Mobil Uyumlu Sayı Tahmin Oyunu</title>
+<style>
+  body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    padding: 15px;
+    margin: 0;
+    background-color: hsl(0, 0%, 98%);
+    transition: background-color 0.5s;
+  }
+  h1 {
+    font-size: 1.8rem;
+    text-align: center;
+    margin-bottom: 15px;
+  }
+  #log {
+    border: 2px solid #ccc;
+    height: 160px;
+    overflow-y: auto;
+    padding: 12px;
+    background: #fefefe;
+    border-radius: 10px;
+    margin-bottom: 15px;
+    font-size: 1.1rem;
+    line-height: 1.3;
+  }
+  #adminPanel {
+    display: none;
+    margin-top: 10px;
+    padding: 12px;
+    border: 2px solid #4caf50;
+    background: #e8f5e9;
+    border-radius: 10px;
+  }
+  input[type="text"],
+  input[type="number"] {
+    width: 100%;
+    font-size: 1.3rem;
+    padding: 12px 15px;
+    margin-bottom: 12px;
+    border-radius: 12px;
+    border: 1.5px solid #aaa;
+    box-sizing: border-box;
+  }
+  button {
+    font-size: 1.3rem;
+    padding: 14px 20px;
+    border: none;
+    border-radius: 12px;
+    margin: 5px 3px;
+    flex: 1;
+    background-color: #4caf50;
+    color: white;
+    font-weight: 600;
+    box-shadow: 0 4px 7px rgba(76,175,80,0.4);
+    transition: background-color 0.3s;
+    user-select: none;
+  }
+  button:hover {
+    background-color: #388e3c;
+    cursor: pointer;
+  }
+  #buttonContainer {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 15px;
+  }
+  #statsDiv, #missions {
+    font-size: 1.1rem;
+    margin-bottom: 10px;
+  }
+  #game {
+    display: none;
+  }
+  @media (min-width: 600px) {
+    body {
+      max-width: 480px;
+      margin: auto;
+    }
+  }
+</style>
+</head>
+<body>
+
+<h1>Mobil Uyumlu Sayı Tahmin Oyunu</h1>
+
+<input type="text" id="username" placeholder="Kullanıcı adını gir" autocomplete="off" />
+<button onclick="login()">Giriş Yap</button>
+
+<div id="game">
+  <p style="font-size:1.2rem;">1 ile 100 arasında sayı tahmin et!</p>
+  
+  <input type="number" id="guessInput" min="1" max="100" autocomplete="off" placeholder="Tahminini gir" />
+  
+  <div id="buttonContainer">
+    <button onclick="makeGuess()">Tahmin Et</button>
+    <button onclick="passTurn()" style="background-color:#f44336;">Pas Ver</button>
+  </div>
+  
+  <div id="log"></div>
+
+  <div id="statsDiv"></div>
+  <div id="missions"></div>
+
+  <div id="adminPanel">
+    <h3>🔧 Admin Paneli</h3>
+    <button onclick="giveGold()">Altın Ver</button>
+    <button onclick="resetScore()">Skoru Sıfırla</button>
+  </div>
+
+  <p style="font-size:0.9rem; margin-top:10px; text-align:center;">* Dans modunu açıp kapatmak için <b>D</b> tuşuna basabilirsin (mobilde destek sınırlı).</p>
+</div>
+
+<script>
+  // Oyun değişkenleri
+  let username = "";
+  let secretNumber = 0;
+  let score = 0;
+  let gold = 0;
+  let guesses = 0;
+  let totalGames = 0;
+  let totalWins = 0;
+  let totalGuesses = 0;
+  let danceMode = false;
+
+  const funnyMessages = [
+    "Patates pizza mı olurmuş ya?",
+    "Bu sayı uzayda mı saklı acaba?",
+    "Daha önce bu kadar kötü tahmin görmedim!",
+    "Sihirli değnek nerede acaba?",
+    "Kahve içmeden tahmin yapmak zor, biliyorum.",
+    "Alienler bu sayıyı biliyor mu acaba?"
+  ];
+
+  const dailyMissions = [
+    "5 tahminde bil",
+    "Hiç ipucu kullanmadan kazan",
+    "3 oyunu üst üste kazan"
+  ];
+
+  function logMessage(msg) {
+    const log = document.getElementById("log");
+    log.innerHTML += msg + "<br>";
+    log.scrollTop = log.scrollHeight;
+  }
+
+  function login() {
+    const input = document.getElementById("username");
+    if (!input.value) {
+      alert("Lütfen kullanıcı adını gir!");
+      return;
+    }
+    username = input.value.trim().toLowerCase();
+    logMessage(`👋 Hoşgeldin, ${username}! Oyuna başla!`);
+    secretNumber = Math.floor(Math.random() * 100) + 1;
+    score = 0;
+    guesses = 0;
+    totalGames = 0;
+    totalWins = 0;
+    totalGuesses = 0;
+
+    if (username === "erenkral") {
+      logMessage("🎉 Gizli yönetici mod aktif!");
+      score += 50;
+      document.getElementById("adminPanel").style.display = "block";
+    } else {
+      document.getElementById("adminPanel").style.display = "none";
+    }
+
+    document.getElementById("game").style.display = "block";
+    updateStats();
+    showMissions();
+
+    // Mobilde klavyeyi gizlemek için inputu blur yap
+    input.blur();
+  }
+
+  function makeGuess() {
+    const guessInput = document.getElementById("guessInput");
+    const guess = Number(guessInput.value);
+    if (!guess || guess < 1 || guess > 100) {
+      alert("1 ile 100 arasında geçerli bir sayı gir!");
+      return;
+    }
+    guesses++;
+    totalGuesses++;
+
+    if (guess === secretNumber) {
+      score += 10;
+      totalGames++;
+      totalWins++;
+      logMessage(`🎉 Doğru bildin! Sayı: ${secretNumber}. Skorun: ${score}`);
+      secretNumber = Math.floor(Math.random() * 100) + 1;
+      guesses = 0;
+      checkForBonus();
+      updateStats();
+      speak("Tebrikler! Doğru tahmin.");
+    } else {
+      score -= 1;
+      if (Math.abs(secretNumber - guess) <= 5) {
+        logMessage("🔥 Sıcak! Çok yakınsın!");
+      } else if (Math.abs(secretNumber - guess) <= 15) {
+        logMessage("🌤️ Ilık, biraz daha dene.");
+      } else {
+        logMessage("❄️ Soğuk! Çok uzak kaldın.");
+        showRandomFunnyMessage();
+      }
+      updateStats();
+      speak("Tekrar dene.");
+    }
+    guessInput.value = "";
+    guessInput.focus();
+  }
+
+  function passTurn() {
+    score -= 5;
+    totalGames++;
+    totalGuesses += guesses;
+    logMessage("⏭️ Pas verdin, -5 skor.");
+    secretNumber = Math.floor(Math.random() * 100) + 1;
+    guesses = 0;
+    updateStats();
+  }
+
+  function giveGold() {
+    gold += 100;
+    logMessage("💰 Admin: 100 altın verildi.");
+    updateStats();
+  }
+
+  function resetScore() {
+    score = 0;
+    logMessage("🧹 Admin: Skor sıfırlandı.");
+    updateStats();
+  }
+
+  function updateStats() {
+    const statsDiv = document.getElementById("statsDiv");
+    const avg = totalGames > 0 ? (totalGuesses / totalGames).toFixed(2) : 0;
+    statsDiv.innerHTML = `
+      📈 Oynanan Oyun: ${totalGames} <br>
+      🏆 Kazanılan: ${totalWins} <br>
+      ✅ Başarı Oranı: ${(totalWins / totalGames * 100).toFixed(1)}% <br>
+      🎯 Ortalama Tahmin: ${avg} <br>
+      💰 Altın: ${gold} <br>
+      ⭐ Skor: ${score}
+    `;
+  }
+
+  function showMissions() {
+    const missionsDiv = document.getElementById("missions");
+    missionsDiv.innerHTML = "📜 Bugünkü Görevler:<br>" + dailyMissions.map(m => `✅ ${m}`).join("<br>");
+  }
+
+  function checkForBonus() {
+    if (totalGames > 0 && totalGames % 5 === 0) {
+      const bonus = Math.floor(Math.random() * 100);
+      gold += bonus;
+      logMessage(`🎁 Sürpriz! +${bonus} altın kazandın!`);
+      speak(`Tebrikler! ${bonus} altın kazandın.`);
+    }
+  }
+
+  function speak(text) {
+    if ('speechSynthesis' in window) {
+      const msg = new SpeechSynthesisUtterance(text);
+      window.speechSynthesis.speak(msg);
+    }
+  }
+
+  function showRandomFunnyMessage() {
+    const msg = funnyMessages[Math.floor(Math.random() * funnyMessages.length)];
+    logMessage("🤣 " + msg);
+  }
+
+  // Dans Modu
+  function toggleDanceMode() {
+    danceMode = !danceMode;
+    const body = document.body;
+    if (danceMode) {
+      body.style.backgroundColor = "#ff69b4";
+      logMessage("🕺 Dans modu aktif! Herkes dansa!");
+      const audio = new Audio('https://www.soundjay.com/button/sounds/button-10.mp3');
+      audio.play();
+    } else {
+      body.style.backgroundColor = "hsl(0, 0%, 98%)";
+      logMessage("🛑 Dans modu kapandı.");
+    }
+  }
+
+  document.addEventListener('keydown', function(event) {
+    if(event.key.toLowerCase() === "d") {
+      toggleDanceMode();
+    }
+  });
+
+</script>
+
+</body>
+</html>
